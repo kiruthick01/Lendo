@@ -31,6 +31,9 @@ contract CreditRegistry {
     mapping(address => CreditProfile) public creditProfiles;
     mapping(address => bool) public hasProfile;
 
+    address public factory;
+    mapping(address => bool) public verifiedCircles;
+
     // Events
     event CreditScoreUpdated(address indexed participant, uint256 newScore, uint256 previousScore);
     event OnTimePaymentRecorded(address indexed participant, uint256 newScore);
@@ -38,6 +41,59 @@ contract CreditRegistry {
     event DefaultRecorded(address indexed participant, uint256 newScore);
     event CircleCompletionRecorded(address indexed participant, uint256 newScore);
     event ProfileCreated(address indexed participant, uint256 initialScore);
+    event FactoryUpdated(address indexed newFactory);
+    event CircleVerified(address indexed circle);
+    event CircleRevoked(address indexed circle);
+
+    modifier onlyFactory() {
+        require(msg.sender == factory, "CreditRegistry: Only factory can call");
+        _;
+    }
+
+    modifier onlyVerifiedCircle() {
+        // The factory itself is also allowed through: it needs to record the
+        // creator's circle-join right after deployment, before the new
+        // LendingCircle has been verified (verification can only happen once
+        // its address is known, i.e. after its constructor has already run).
+        require(
+            verifiedCircles[msg.sender] || msg.sender == factory,
+            "CreditRegistry: Only verified circles or factory can call"
+        );
+        _;
+    }
+
+    constructor() {
+        factory = msg.sender;
+    }
+
+    /**
+     * @notice Set the factory address (can only be called by current factory/deployer)
+     * @param _factory Address of the LendingCircleFactory contract
+     */
+    function setFactory(address _factory) external onlyFactory {
+        require(_factory != address(0), "CreditRegistry: Invalid factory address");
+        factory = _factory;
+        emit FactoryUpdated(_factory);
+    }
+
+    /**
+     * @notice Verify a lending circle contract
+     * @param circle Address of the LendingCircle contract
+     */
+    function verifyCircle(address circle) external onlyFactory {
+        require(circle != address(0), "CreditRegistry: Invalid circle address");
+        verifiedCircles[circle] = true;
+        emit CircleVerified(circle);
+    }
+
+    /**
+     * @notice Revoke verification of a lending circle contract
+     * @param circle Address of the LendingCircle contract
+     */
+    function revokeCircle(address circle) external onlyFactory {
+        verifiedCircles[circle] = false;
+        emit CircleRevoked(circle);
+    }
 
     /**
      * @notice Get credit score for an address
@@ -75,7 +131,7 @@ contract CreditRegistry {
      * @notice Record an on-time payment
      * @param participant Address that made the payment
      */
-    function recordOnTimePayment(address participant) external {
+    function recordOnTimePayment(address participant) external onlyVerifiedCircle {
         _ensureProfile(participant);
         
         uint256 previousScore = creditProfiles[participant].creditScore;
@@ -97,7 +153,7 @@ contract CreditRegistry {
      * @notice Record a late payment
      * @param participant Address that made a late payment
      */
-    function recordLatePayment(address participant) external {
+    function recordLatePayment(address participant) external onlyVerifiedCircle {
         _ensureProfile(participant);
         
         uint256 previousScore = creditProfiles[participant].creditScore;
@@ -118,7 +174,7 @@ contract CreditRegistry {
      * @notice Record a default
      * @param participant Address that defaulted
      */
-    function recordDefault(address participant) external {
+    function recordDefault(address participant) external onlyVerifiedCircle {
         _ensureProfile(participant);
         
         uint256 previousScore = creditProfiles[participant].creditScore;
@@ -140,7 +196,7 @@ contract CreditRegistry {
      * @notice Record circle completion
      * @param participant Address that completed a circle
      */
-    function recordCircleCompletion(address participant) external {
+    function recordCircleCompletion(address participant) external onlyVerifiedCircle {
         _ensureProfile(participant);
         
         uint256 previousScore = creditProfiles[participant].creditScore;
@@ -162,7 +218,7 @@ contract CreditRegistry {
      * @notice Record joining a circle (internal, called by LendingCircle)
      * @param participant Address joining a circle
      */
-    function recordCircleJoin(address participant) external {
+    function recordCircleJoin(address participant) external onlyVerifiedCircle {
         _ensureProfile(participant);
         creditProfiles[participant].circlesJoined++;
     }

@@ -209,7 +209,10 @@ contract LendingCircle {
         participantList.push(_creator);
         totalParticipants = 1;
 
-        creditRegistry.recordCircleJoin(_creator);
+        // Not recorded here: at construction time this contract's own address
+        // isn't verified in CreditRegistry yet (verification can only happen
+        // after deployment, once the address is known). The factory records
+        // the creator's join right after verifying this circle.
 
         emit CircleCreated(_creator, _monthlyContribution, _durationInMonths, _minParticipants, _maxParticipants);
     }
@@ -245,8 +248,10 @@ contract LendingCircle {
 
         emit ParticipantApproved(participant);
 
-        // Auto-activate if minimum reached
-        if (totalParticipants >= minParticipants) {
+        // Auto-activate if minimum approved (active) participants reached.
+        // totalParticipants also counts pending, unapproved join requests, so
+        // it isn't a valid proxy for "enough participants are actually active".
+        if (_getActiveParticipantCount() >= minParticipants) {
             _activateCircle();
         }
     }
@@ -469,10 +474,12 @@ contract LendingCircle {
             if (participants[candidate].isInDefault) continue;
 
             uint256 candidateVotes = cand.totalVotes;
+            if (candidateVotes == 0) continue; // must receive at least one vote to win
+
             uint256 candidateCredit = creditRegistry.getCreditScore(candidate);
 
             // Select candidate with most votes, or if tied, highest credit score
-            if (candidateVotes > bestVotes || 
+            if (candidateVotes > bestVotes ||
                 (candidateVotes == bestVotes && candidateCredit > bestCredit)) {
                 bestCandidate = candidate;
                 bestVotes = candidateVotes;
@@ -584,7 +591,7 @@ contract LendingCircle {
      * @notice Internal: Activate the circle
      */
     function _activateCircle() internal {
-        require(totalParticipants >= minParticipants, "LendingCircle: Not enough participants");
+        require(_getActiveParticipantCount() >= minParticipants, "LendingCircle: Not enough participants");
         status = CircleStatus.ACTIVE;
         emit CircleActivated(totalParticipants);
     }
