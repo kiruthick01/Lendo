@@ -38,9 +38,10 @@ async function main() {
 
   // Deploy contracts
   await deployContracts();
-  
-  // Update ReservePool factory address
+
+  // Update ReservePool and CreditRegistry factory addresses
   await reservePool.setFactory(await factory.getAddress());
+  await creditRegistry.setFactory(await factory.getAddress());
 
   // Run tests
   await testCreditRegistry();
@@ -65,6 +66,11 @@ async function deployContracts() {
   creditRegistry = await CreditRegistry.deploy();
   await creditRegistry.waitForDeployment();
   console.log("✅ CreditRegistry deployed");
+
+  // Verify the deployer as a "circle" so the direct recordX calls in the
+  // tests below (simulating what a LendingCircle would call) are allowed
+  // under CreditRegistry's onlyVerifiedCircle gating.
+  await creditRegistry.connect(deployer).verifyCircle(deployer.account.address);
 
   // Deploy ReservePool
   const ReservePool = await hre.ethers.getContractFactory("ReservePool");

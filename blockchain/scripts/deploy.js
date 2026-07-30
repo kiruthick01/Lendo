@@ -151,6 +151,13 @@ async function main() {
   console.log("✅ ReservePool factory address updated\n");
 
   // ============================================
+  // 4.5. Update CreditRegistry factory address
+  // ============================================
+  console.log("4️⃣.5️⃣  Updating CreditRegistry factory address...");
+  await creditRegistry.write.setFactory([factoryAddress]);
+  console.log("✅ CreditRegistry factory address updated\n");
+
+  // ============================================
   // 5. Verification and Summary
   // ============================================
   console.log("=".repeat(60));

@@ -83,8 +83,14 @@ contract LendingCircleFactory {
         isCircle[circle] = true;
         userCircles[msg.sender].push(circle);
 
-        // Verify circle in ReservePool
+        // Verify circle in ReservePool and CreditRegistry
         reservePool.verifyCircle(circle);
+        creditRegistry.verifyCircle(circle);
+
+        // The circle's constructor couldn't record this itself: it wasn't
+        // verified in CreditRegistry until the line above, which can only
+        // run after deployment (its address wasn't known beforehand).
+        creditRegistry.recordCircleJoin(msg.sender);
 
         emit CircleCreated(
             msg.sender,

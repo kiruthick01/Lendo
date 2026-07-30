@@ -1,7 +1,8 @@
-import "@nomicfoundation/hardhat-viem";
+import hardhatViem from "@nomicfoundation/hardhat-viem";
 import { configVariable, defineConfig } from "hardhat/config";
 
 export default defineConfig({
+  plugins: [hardhatViem],
   solidity: {
     version: "0.8.28",
     settings: {
